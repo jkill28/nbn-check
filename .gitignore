@@ -9,4 +9,5 @@ local.properties
 resize_icons.py
 build_output.log
 gradle.properties
-# No need to ignore gradle-wrapper.jar if it's there, but I don't have it anyway.
+# Explicitly track the APK
+!nbn-fiber-checker.apk
