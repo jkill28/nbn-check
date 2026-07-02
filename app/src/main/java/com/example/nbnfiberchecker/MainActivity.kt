@@ -6,11 +6,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -20,42 +24,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.nbnfiberchecker.data.AddressDetail
-import com.example.nbnfiberchecker.data.NbnRepository
+import com.example.nbnfiberchecker.data.AddressSuggestion
 import com.example.nbnfiberchecker.ui.theme.NBNFiberCheckerTheme
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.launch
-
-class MainViewModel : ViewModel() {
-    private val repository = NbnRepository()
-
-    var results by mutableStateOf<List<AddressDetail>>(emptyList())
-        private set
-
-    var isRefreshing by mutableStateOf(false)
-        private set
-
-    private val locationIds = listOf("LOC000007898843", "LOC000021958561")
-
-    init {
-        refresh()
-    }
-
-    fun refresh() {
-        viewModelScope.launch {
-            isRefreshing = true
-            val deferred = locationIds.map { id ->
-                async { repository.fetchNbnDetails(id) }
-            }
-            results = deferred.awaitAll().mapNotNull { it.getOrNull() }
-            isRefreshing = false
-        }
-    }
-}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -74,6 +46,7 @@ class MainActivity : ComponentActivity() {
 fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val context = LocalContext.current
     var lastBackPressTime by remember { mutableLongStateOf(0L) }
+    var showSearchDialog by remember { mutableStateOf(false) }
 
     BackHandler {
         val currentTime = System.currentTimeMillis()
@@ -85,11 +58,27 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         }
     }
 
+    if (showSearchDialog) {
+        SearchDialog(
+            onDismiss = { showSearchDialog = false },
+            onSuggestionSelected = { suggestion ->
+                viewModel.addLocation(suggestion.id)
+                showSearchDialog = false
+            },
+            viewModel = viewModel
+        )
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("NBN Fiber Checker", style = MaterialTheme.typography.headlineMedium) }
+                title = { Text("NBN Fiber Checker", style = MaterialTheme.typography.headlineMedium) },
+                actions = {
+                    IconButton(onClick = { showSearchDialog = true }) {
+                        Icon(Icons.Default.Add, contentDescription = "Add Location")
+                    }
+                }
             )
         },
         floatingActionButton = {
@@ -119,13 +108,23 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 .fillMaxSize()
                 .nestedScroll(state.nestedScrollConnection)
         ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(viewModel.results) { detail ->
-                    NbnDetailCard(detail)
+            if (viewModel.results.isEmpty() && !viewModel.isRefreshing) {
+                Text(
+                    "No locations added. Tap + to search.",
+                    modifier = Modifier.align(Alignment.Center),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    items(viewModel.results) { detail ->
+                        NbnDetailCard(detail, onDelete = {
+                            detail.id?.let { viewModel.removeLocationById(it) }
+                        })
+                    }
                 }
             }
 
@@ -138,7 +137,52 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
 }
 
 @Composable
-fun NbnDetailCard(detail: AddressDetail) {
+fun SearchDialog(
+    onDismiss: () -> Unit,
+    onSuggestionSelected: (AddressSuggestion) -> Unit,
+    viewModel: MainViewModel
+) {
+    var query by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Search Address") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextField(
+                    value = query,
+                    onValueChange = {
+                        query = it
+                        viewModel.search(it)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Enter postal address...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    singleLine = true
+                )
+
+                LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+                    items(viewModel.searchResults) { suggestion ->
+                        Text(
+                            text = suggestion.formattedAddress,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSuggestionSelected(suggestion) }
+                                .padding(vertical = 12.dp, horizontal = 8.dp),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+fun NbnDetailCard(detail: AddressDetail, onDelete: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
@@ -147,8 +191,26 @@ fun NbnDetailCard(detail: AddressDetail) {
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            PropertyRow("Address", detail.formattedAddress)
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Address",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                }
+            }
+            Text(
+                text = detail.formattedAddress ?: "N/A",
+                style = MaterialTheme.typography.bodyLarge
+            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
             PropertyRow("Tech change status", detail.techChangeStatus)
             PropertyRow("Target eligibility", detail.targetEligibilityQuarter)
             PropertyRow("Tech type", detail.techType)
@@ -157,6 +219,7 @@ fun NbnDetailCard(detail: AddressDetail) {
             PropertyRow("Alt reason code", detail.altReasonCode)
             PropertyRow("Program type", detail.programType)
             PropertyRow("MDU Fibre Eligibility", detail.mduFibreEligibility?.toString())
+            PropertyRow("Location ID", detail.id)
         }
     }
 }

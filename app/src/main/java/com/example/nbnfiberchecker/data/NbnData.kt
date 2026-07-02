@@ -9,6 +9,7 @@ data class NbnResponse(
 
 @Serializable
 data class AddressDetail(
+    var id: String? = null, // Add ID field
     val reasonCode: String? = null,
     val altReasonCode: String? = null,
     val techChangeStatus: String? = null,
@@ -18,4 +19,15 @@ data class AddressDetail(
     val mduFibreEligibility: Boolean? = null,
     val techType: String? = null,
     val formattedAddress: String? = null
+)
+
+@Serializable
+data class AddressSuggestionResponse(
+    val suggestions: List<AddressSuggestion> = emptyList()
+)
+
+@Serializable
+data class AddressSuggestion(
+    val id: String,
+    val formattedAddress: String
 )
