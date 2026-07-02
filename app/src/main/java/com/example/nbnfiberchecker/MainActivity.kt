@@ -145,24 +145,39 @@ fun NbnDetailCard(detail: AddressDetail) {
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Text(
-                text = "Tech change status: ${detail.techChangeStatus ?: "N/A"}",
-                style = MaterialTheme.typography.bodyLarge
-            )
-            Text(
-                text = "Target eligibility (targetEligibilityQuarter): ${detail.targetEligibilityQuarter ?: "N/A"}",
-                style = MaterialTheme.typography.bodyLarge
-            )
-            Text(
-                text = "tech type: ${detail.techType ?: "N/A"} ${detail.techFlip ?: ""}",
-                style = MaterialTheme.typography.bodyLarge
-            )
-            Text(
-                text = "Address: ${detail.formattedAddress ?: "N/A"}",
-                style = MaterialTheme.typography.bodyLarge
-            )
+            PropertyRow("Address", detail.formattedAddress)
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            PropertyRow("Tech change status", detail.techChangeStatus)
+            PropertyRow("Target eligibility", detail.targetEligibilityQuarter)
+            PropertyRow("Tech type", detail.techType)
+            PropertyRow("Tech flip", detail.techFlip)
+            PropertyRow("Reason code", detail.reasonCode)
+            PropertyRow("Alt reason code", detail.altReasonCode)
+            PropertyRow("Program type", detail.programType)
+            PropertyRow("MDU Fibre Eligibility", detail.mduFibreEligibility?.toString())
         }
+    }
+}
+
+@Composable
+fun PropertyRow(label: String, value: String?) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = "$label:",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.secondary,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = value ?: "N/A",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(2f)
+        )
     }
 }

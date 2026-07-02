@@ -1,5 +1,12 @@
 .gradle/
+build/
+app/build/
 *.iml
 .idea/
 local.properties
 .DS_Store
+/tmp/file_attachments/
+resize_icons.py
+build_output.log
+gradle.properties
+# No need to ignore gradle-wrapper.jar if it's there, but I don't have it anyway.
