@@ -29,7 +29,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private set
 
     init {
-        val savedIds = sharedPrefs.getStringSet("location_ids", setOf("LOC000007898843", "LOC000021958561")) ?: emptySet()
+        val savedIds = sharedPrefs.getStringSet("location_ids", emptySet()) ?: emptySet()
         _locationIds.addAll(savedIds)
         refresh()
     }
