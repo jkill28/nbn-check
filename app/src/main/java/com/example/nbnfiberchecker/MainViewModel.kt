@@ -12,6 +12,12 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 
+enum class ThemeMode {
+    SYSTEM,
+    LIGHT,
+    DARK
+}
+
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = NbnRepository()
     private val sharedPrefs = application.getSharedPreferences("nbn_checker_prefs", Context.MODE_PRIVATE)
@@ -28,10 +34,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var searchResults by mutableStateOf<List<AddressSuggestion>>(emptyList())
         private set
 
+    var themeMode by mutableStateOf(loadThemeMode())
+        private set
+
+    val eligibleCount: Int
+        get() = results.count { detail ->
+            detail.techChangeStatus?.contains("ELIGIBLE", ignoreCase = true) == true ||
+            detail.techFlip?.contains("Eligible", ignoreCase = true) == true ||
+            detail.techType?.equals("FTTP", ignoreCase = true) == true
+        }
+
     init {
         val savedIds = sharedPrefs.getStringSet("location_ids", emptySet()) ?: emptySet()
         _locationIds.addAll(savedIds)
         refresh()
+    }
+
+    private fun loadThemeMode(): ThemeMode {
+        val modeStr = sharedPrefs.getString("app_theme_mode", ThemeMode.SYSTEM.name) ?: ThemeMode.SYSTEM.name
+        return try {
+            ThemeMode.valueOf(modeStr)
+        } catch (e: Exception) {
+            ThemeMode.SYSTEM
+        }
+    }
+
+    fun updateThemeMode(mode: ThemeMode) {
+        themeMode = mode
+        sharedPrefs.edit().putString("app_theme_mode", mode.name).apply()
     }
 
     private fun saveIds() {
@@ -59,15 +89,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             saveIds()
             refresh()
         }
-    }
-
-    fun removeLocation(id: String) {
-        // We need the ID from the result or we store a map.
-        // Let's find the ID by matching the result's address if needed, or just remove from the list.
-        // But the UI shows cards from 'results'.
-        // Let's assume we remove by index or something.
-        // Or better, NbnDetail doesn't have the ID. Let's modify AddressDetail to include it if possible,
-        // or just match by formattedAddress.
     }
 
     fun removeLocationById(id: String) {
